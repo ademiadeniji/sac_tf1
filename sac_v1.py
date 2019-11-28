@@ -104,12 +104,12 @@ def train_eval(
     td_errors_loss_fn=tf.compat.v1.losses.mean_squared_error,
     gamma=0.99,
     reward_scale_factor=1.0,
-    gradient_clipping=None,
+    gradient_clipping=True,
     # Params for eval
     num_eval_episodes=30,
     eval_interval=10000,
     # Params for summaries and logging
-    train_checkpoint_interval=10000,
+    train_checkpoint_interval=1000000000,
     policy_checkpoint_interval=5000,
     rb_checkpoint_interval=50000,
     log_interval=1000,
