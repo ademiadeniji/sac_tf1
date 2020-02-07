@@ -30,6 +30,9 @@ import time
 import matplotlib
 matplotlib.use("pdf")
 import matplotlib.pyplot as plt
+import base64
+import IPython
+import imageio
 from absl import app
 from absl import flags
 from absl import logging
@@ -59,6 +62,7 @@ from tf_agents.specs import tensor_spec
 
 #import gym_backcheetah
 #import gym_fifteencheetah
+#import gym_sincheetah
 
 flags.DEFINE_string('root_dir', os.getenv('TEST_UNDECLARED_OUTPUTS_DIR'),
                     'Root directory for writing logs/summaries/checkpoints.')
@@ -131,7 +135,7 @@ def train_eval(
     rb_checkpoint_interval=100000,
     log_interval=1000,
     plot_interval=100000,
-    video_interval=1000000000,
+    video_interval=100000,
     summary_interval=1000,
     summaries_flush_secs=10,
     debug_summaries=False,
@@ -356,28 +360,54 @@ def train_eval(
 
         if global_step_val % rb_checkpoint_interval == 0:
           rb_checkpointer.save(global_step=global_step_val)
-        
-        
-        if global_step_val % video_interval == 0: 
-          print('Creating video at {}k iterations...'.format(int(global_step_val/1000)))
+        step = global_step_val
+        if step % video_interval == 0:
+          print('Creating video at {}k iterations...'.format(int(step/1000)))
 
           num_episodes = 3
-          video_filename = FLAGS.root_dir + '/videos/sac' + env_name[:-3] + str(int(global_step_val/1000)) + 'k.mp4'
-      
+          video_filename = FLAGS.root_dir + '/videos/sac' + env_name[:-3] + str(int(step/1000)) + 'k.mp4'
+
           with imageio.get_writer(video_filename, fps=60) as video:
             for _ in range(num_episodes):
               time_step = eval_py_env.reset()
               video.append_data(eval_py_env.render())
-            while not time_step.is_last():
-              action_step = tf_agent.policy.action(time_step)
-              time_step = eval_py_env.step(action_step.action)
-              video.append_data(eval_py_env.render())
-     
-              embed_mp4(video_filename)
+              while not time_step.is_last():
+                action_step = tf_agent.policy.action(time_step)
+                time_step = eval_py_env.step(action_step.action.eval())
+                video.append_data(eval_py_env.render())
+            embed_mp4(video_filename)
+    
+#        if global_step_val % video_interval == 0:
+
+#          time_step = eval_py_env.reset() 
+#          eval_py_env.render()
+#          for _ in range(100):
+#            action_step = tf_agent.policy.action(time_step)
+#            time_step = eval_py_env.step(action_step.action.eval())
+#            eval_py_env.render()
+#            print(_)
+#          print('Creating video at {}k iterations...'.format(int(global_step_val/1000)))
+
+#          num_episodes = 3
+#          video_filename = FLAGS.root_dir + '/videos/sac' + env_name[:-3] + str(int(global_step_val/1000)) + 'k.mp4'
+      
+#          with imageio.get_writer(video_filename, fps=60) as video:
+#            for _ in range(num_episodes):
+#              time_step = eval_py_env.reset()
+#              video.append_data(eval_py_env.render())
+#            #while not time_step.is_last():
+#            num_steps = 0
+#            while num_steps < 10:
+#              action_step = tf_agent.policy.action(time_step)
+#              time_step = eval_py_env.step(action_step.action.eval())
+#              video.append_data(eval_py_env.render())
+#              embed_mp4(video_filename)
+#              num_steps += 1
+#              print(num_steps)
+
         if global_step_val % plot_interval == 0:
           print("Plotting returns...") 
           steps, returns = zip(*returnsCache)
-          steps = [x - 1600000 for x in steps]
           plt.plot(steps, returns)
           plt.ylabel('Average Return')
           plt.xlabel('Step')
