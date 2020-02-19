@@ -60,16 +60,18 @@ from tf_agents.replay_buffers import tf_uniform_replay_buffer
 from tf_agents.utils import common
 from tf_agents.specs import tensor_spec
 
-#import gym_backcheetah
-#import gym_fifteencheetah
-#import gym_sincheetah
+import gym_backcheetah
+import gym_bothcheetah
+import gym_sincheetah
 
 flags.DEFINE_string('root_dir', os.getenv('TEST_UNDECLARED_OUTPUTS_DIR'),
                     'Root directory for writing logs/summaries/checkpoints.')
 flags.DEFINE_multi_string('gin_file', None,
                           'Path to the gin config files.')
 flags.DEFINE_multi_string('gin_param', None, 'Gin binding to pass through.')
-
+flags.DEFINE_integer('path_len', 200, 'Max path length for rollout')
+flags.DEFINE_string('env_name', 'HalfCheetah-v2', 'Name of mujoco env')
+flags.DEFINE_integer('num_eps', 3, 'number of episodes of rollout')
 FLAGS = flags.FLAGS
 
 @gin.configurable
@@ -101,7 +103,9 @@ def embed_mp4(filename):
 @gin.configurable
 def train_eval(
     root_dir,
-    env_name='HalfCheetah-v2',
+    env_name="HalfCheetah-v2",
+    path_len=200,
+    num_eps=3,
     eval_env_name=None,
     env_load_fn=suite_gym.load,
     num_iterations=3000000,
@@ -134,8 +138,8 @@ def train_eval(
     policy_checkpoint_interval=100000,
     rb_checkpoint_interval=100000,
     log_interval=1000,
-    plot_interval=100000,
-    video_interval=100000,
+    plot_interval=1000000,
+    video_interval=200000,
     summary_interval=1000,
     summaries_flush_secs=10,
     debug_summaries=False,
@@ -360,50 +364,24 @@ def train_eval(
 
         if global_step_val % rb_checkpoint_interval == 0:
           rb_checkpointer.save(global_step=global_step_val)
+
         step = global_step_val
         if step % video_interval == 0:
           print('Creating video at {}k iterations...'.format(int(step/1000)))
 
-          num_episodes = 3
           video_filename = FLAGS.root_dir + '/videos/sac' + env_name[:-3] + str(int(step/1000)) + 'k.mp4'
 
           with imageio.get_writer(video_filename, fps=60) as video:
-            for _ in range(num_episodes):
+            for _ in range(num_eps):
               time_step = eval_py_env.reset()
               video.append_data(eval_py_env.render())
-              while not time_step.is_last():
+              steps = 0
+              while steps < path_len:
                 action_step = tf_agent.policy.action(time_step)
                 time_step = eval_py_env.step(action_step.action.eval())
                 video.append_data(eval_py_env.render())
-            embed_mp4(video_filename)
-    
-#        if global_step_val % video_interval == 0:
-
-#          time_step = eval_py_env.reset() 
-#          eval_py_env.render()
-#          for _ in range(100):
-#            action_step = tf_agent.policy.action(time_step)
-#            time_step = eval_py_env.step(action_step.action.eval())
-#            eval_py_env.render()
-#            print(_)
-#          print('Creating video at {}k iterations...'.format(int(global_step_val/1000)))
-
-#          num_episodes = 3
-#          video_filename = FLAGS.root_dir + '/videos/sac' + env_name[:-3] + str(int(global_step_val/1000)) + 'k.mp4'
-      
-#          with imageio.get_writer(video_filename, fps=60) as video:
-#            for _ in range(num_episodes):
-#              time_step = eval_py_env.reset()
-#              video.append_data(eval_py_env.render())
-#            #while not time_step.is_last():
-#            num_steps = 0
-#            while num_steps < 10:
-#              action_step = tf_agent.policy.action(time_step)
-#              time_step = eval_py_env.step(action_step.action.eval())
-#              video.append_data(eval_py_env.render())
-#              embed_mp4(video_filename)
-#              num_steps += 1
-#              print(num_steps)
+                steps += 1
+            embed_mp4(video_filename)   
 
         if global_step_val % plot_interval == 0:
           print("Plotting returns...") 
@@ -419,7 +397,7 @@ def main(_):
   tf.compat.v1.enable_resource_variables()
   logging.set_verbosity(logging.INFO)
   gin.parse_config_files_and_bindings(FLAGS.gin_file, FLAGS.gin_param)
-  train_eval(FLAGS.root_dir)
+  train_eval(FLAGS.root_dir, FLAGS.env_name, FLAGS.path_len, FLAGS.num_eps)
 
 
 if __name__ == '__main__':
